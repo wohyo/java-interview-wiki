@@ -1,0 +1,17 @@
+{
+  "name": "java-interview-wiki",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev docs",
+    "build": "vitepress build docs",
+    "build:local": "cross-env VP_BASE=/ vitepress build docs",
+    "preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "@vite-pwa/vitepress": "^0.5.4",
+    "cross-env": "^7.0.3",
+    "vitepress": "1.6.0",
+    "vue": "3.4.0"
+  }
+}
