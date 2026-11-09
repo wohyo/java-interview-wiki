@@ -1,8 +1,6 @@
 # CountDownLatch 倒计时计数器
 
-在日常编码中，Java 并发编程可是少不了，试试下面这些并发编程工具类：
-
-今天先带领大家一起重温学习 CountDownLatch 这个牛叉的工具类。
+**一句话定位**：`CountDownLatch` 让一个（或多个）线程等待另外 N 个线程完成任务——计数器初始为 N，每个线程完成后 `countDown()`，减到 0 时所有 `await()` 的线程被唤醒。
 
 ## 认识 CountDownLatch
 
@@ -124,4 +122,65 @@ main thread: all message has been sent
 
 ## Q：说说CountDownLatch 的限制？
 
-CountDownLatch是一次性的，计算器的值只能在构造方法中初始化一次，之后没有任何机制再次对其设置值，当CountDownLatch使用完毕后，它不能再次被使用。
+### 1. 一次性
+
+`CountDownLatch` 是一次性的：计数器的值只能在构造方法中初始化一次，减到 0 后没有任何机制重置。**用完即废**，要复用只能新建一个实例。
+
+这也是它和 `CyclicBarrier` 最本质的区别。
+
+### 2. 底层是 AQS 共享模式
+
+`CountDownLatch` 内部有一个 `Sync extends AbstractQueuedSynchronizer`：
+
+- `state` 就是计数器；
+- `countDown()` → `releaseShared(1)`，CAS 把 state 减 1，减到 0 时唤醒所有共享节点；
+- `await()` → `acquireSharedInterruptibly(1)`，state 不为 0 就入队 park。
+
+```java
+// 简化后的 Sync
+protected int tryAcquireShared(int acquires) {
+    return (getState() == 0) ? 1 : -1;      // state 为 0 才算获取成功
+}
+
+protected boolean tryReleaseShared(int releases) {
+    for (;;) {
+        int c = getState();
+        if (c == 0) return false;
+        int nextc = c - 1;
+        if (compareAndSetState(c, nextc))
+            return nextc == 0;               // 减到 0 时返回 true，唤醒后继
+    }
+}
+```
+
+还有一个常被忽略的语义：**`countDown()` 之前的操作，happens-before `await()` 返回之后的操作**。所以子线程写入的结果，主线程 `await()` 之后一定看得到——不需要额外的同步。
+
+### 3. 不能循环使用：和 CyclicBarrier 的对比
+
+```java
+// CyclicBarrier：一组线程互相等待，到齐后一起继续，并且可以重复使用
+CyclicBarrier barrier = new CyclicBarrier(3, () -> System.out.println("all arrived"));
+
+for (int i = 0; i < 3; i++) {
+    new Thread(() -> {
+        try {
+            System.out.println(Thread.currentThread().getName() + " arrived");
+            barrier.await();               // 等另外两个线程
+            System.out.println(Thread.currentThread().getName() + " continue");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }).start();
+}
+```
+
+| 维度 | CountDownLatch | CyclicBarrier |
+| --- | --- | --- |
+| 方向 | 一个/多个线程等 N 个线程完成 | N 个线程互相等待 |
+| 复用 | ❌ 一次性 | ✅ 可循环（`reset()` 或自动重置） |
+| 计数 | 减到 0 | 加到 parties |
+| 底层 | AQS 共享模式 | `ReentrantLock` + `Condition` |
+| 异常 | 不会“打破”，其他线程继续等 | 一个线程异常/超时，整个 barrier 被打破 |
+| 典型场景 | 主线程等子任务全部完成 | 多阶段并行计算，每个阶段要同步 |
+
+记忆：**CountDownLatch 是“等人齐了开会”，CyclicBarrier 是“人齐了出发，下一段再集合”。**

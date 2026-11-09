@@ -1,7 +1,9 @@
 # Optional 与空指针
 
-&gt;Java8 由Oracle在2014年发布，是继Java5之后最具革命性的版本。
-&gt;Java8吸收其他语言的精髓带来了函数式编程，lambda表达式，Stream流等一系列新特性，学会了这些新特性，可以让你实现高效编码优雅编码。
+> Optional 是 Java 8 引入的容器类，用来显式表达“这个值可能不存在”，从而减少空指针判断。
+>
+> 它不是银弹：适合做方法返回值，不适合做字段类型和参数；过度使用反而会让代码更难读。
+
 ## 1. 不受待见的空指针异常
 
 有个小故事：null引用最早是由英国科学家Tony Hoare提出的，多年后Hoare为自己的这个想法感到后悔莫及，并认为这是"价值百万的重大失误"。可见空指针是多么不受待见。
@@ -121,22 +123,28 @@ public final class Optional<T> {
 以上就是Optional类常用的方法，使用起来非常简单。
 ## 4. Optional使用入门
 
-**（1）创建Optional实例**
+**（1）创建 Optional 实例**
 
-* 创建空的Optional对象。可以通过静态工厂方法Optional.Empty() 创建一个空的对象，例如：
+| 方法 | 入参 | 空值行为 |
+| --- | --- | --- |
+| `Optional.empty()` | 无 | 创建一个空 Optional |
+| `Optional.of(value)` | 必须非 null | 传 null 直接抛 `NullPointerException` |
+| `Optional.ofNullable(value)` | 可以为 null | null 返回 `Optional.empty()` |
+
 ```java
-Optional<Person> optionalPerson = Optional.Empty();
-```
-* 指定非空值创建Optional对象。
-```java
+// 空对象
+Optional<Person> empty = Optional.empty();
+
+// 确定非空
 Person person = new Person();
-Optional<Person> optionalPerson = Optional.of(person);
+Optional<Person> nonNull = Optional.of(person);
+
+// 可能为空（最常用）
+Person maybeNull = null;
+Optional<Person> nullable = Optional.ofNullable(maybeNull);
 ```
-* 指定可能为空的值创建Optional对象。
-```java
-Person person = null; // 可能为空
-Optional<Person> optionalPerson = Optional.of(person);
-```
+
+记忆：**不确定是否为空就用 `ofNullable`**；`of` 是“我保证非空”的断言，用错会直接 NPE，反而违背了 Optional 的初衷。
 **（2）常用方法**
 **ifPresent**
 
@@ -168,7 +176,7 @@ public void test(String city) {
 ```java
 public void test2(String city) {
     // 如果city为空，则调用generateDefaultCity方法
-    String defaultCity = Optional.of(city).orElseGet(this::generateDefaultCity);
+    String defaultCity = Optional.ofNullable(city).orElseGet(this::generateDefaultCity);
 }
 private String generateDefaultCity() {
     return "beijing";
@@ -180,7 +188,7 @@ private String generateDefaultCity() {
 ```java
 public void test3(String city) {
     // 如果city为空，则抛出空指针异常。
-    String defaultCity = Optional.of(city).orElseThrow(NullPointerException::new);
+    String defaultCity = Optional.ofNullable(city).orElseThrow(NullPointerException::new);
 }
 ```
 ## Q：如何使用Optional重构代码？
@@ -215,4 +223,4 @@ public String getCityUsingOptional(Person person) {
 ```
 只使用了一行代码就获取到city值，不用再去不断的判断是否为空，这样写代码是不是很优雅呀。
 ## 总结
-使用optional类可以很优雅的解决项目中空指针的问题，但是optional也不是万能的哦，小伙伴们要适度使用。赶紧用Optional重构之前写的项目吧~**
+使用 Optional 可以更优雅地处理空值，但它不是万能的：它是**方法返回值**的语义表达，不适合做字段类型、方法参数，也不该用来替代所有 if 判断。过度使用只会让代码更难读。

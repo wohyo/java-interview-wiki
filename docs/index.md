@@ -36,5 +36,3 @@ features:
 - 九、设计模式：单例、工厂、代理
 - 十、消息队列：Kafka TPS 原理、消息丢失
 - 十一、Java 8：Lambda、Stream、Optional
-
-> 

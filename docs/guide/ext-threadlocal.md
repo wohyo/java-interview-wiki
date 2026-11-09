@@ -27,7 +27,7 @@ public class ThreadPoolDemo {
 }
 ```
 代码分析：
-* 创建一个核心线程数和最大线程数都为10的线程池，保证线程池里一直会有10个线程在运行。
+* 创建一个核心线程数和最大线程数都为 5 的线程池，保证线程池里一直有 5 个线程在运行。
 * 使用for循环向线程池中提交了100个任务。
 * 定义了一个ThreadLocal类型的变量，Value类型是大对象。
 * 每个任务会向threadLocal变量里塞一个大对象，然后执行其他业务逻辑。
@@ -35,9 +35,9 @@ public class ThreadPoolDemo {
 
 乍一看这代码好像没有什么问题，那为什么会导致服务GC后内存还高居不下呢？
 
-代码中给threadLocal赋值了一个大的对象，但是执行完业务逻辑后没有调用remove方法，最后导致线程池中10个线程的threadLocals变量中包含的大对象没有被释放掉，出现了内存泄露。
+代码中给 threadLocal 赋值了一个大对象，但是执行完业务逻辑后没有调用 remove 方法。线程池的 5 个线程会长期存活，每个线程的 `threadLocals` 里都挂着一个 100MB 的对象，任务结束后也没有被释放，最终导致内存泄漏。
 
-大家说说这样的实习生还能留不？
+关键点：`ThreadLocal` 变量是方法内的局部变量，任务结束后它本身可以被回收；但 value 存在**线程对象**的 `ThreadLocalMap` 里，线程不死，value 就一直被引用着。
 
 ## Q：ThreadLocal的value值存在哪里？
 
@@ -134,8 +134,8 @@ class ThreadLocal<T> {
 
 * 每个线程是一个Thread实例，其内部维护一个threadLocals的实例成员，其类型是ThreadLocal.ThreadLocalMap。
 * 通过实例化ThreadLocal实例，我们可以对当前运行的线程设置一些线程私有的变量，通过调用ThreadLocal的set和get方法存取。
-* ThreadLocal本身并不是一个容器，我们存取的value实际上存储在ThreadLocalMap中，ThreadLocal只是作为TheadLocalMap的key。
-* 每个线程实例都对应一个TheadLocalMap实例，我们可以在同一个线程里实例化很多个ThreadLocal来存储很多种类型的值，这些ThreadLocal实例分别作为key，对应各自的value，最终存储在Entry table数组中。
+* ThreadLocal本身并不是一个容器，我们存取的value实际上存储在ThreadLocalMap中，ThreadLocal只是作为ThreadLocalMap的key。
+* 每个线程实例都对应一个ThreadLocalMap实例，我们可以在同一个线程里实例化很多个ThreadLocal来存储很多种类型的值，这些ThreadLocal实例分别作为key，对应各自的value，最终存储在Entry table数组中。
 * 当调用ThreadLocal的set/get进行赋值/取值操作时，首先获取当前线程的ThreadLocalMap实例，然后就像操作一个普通的map一样，进行put和get。
 ## Q：说说ThreadLocal内存模型原理？
 
@@ -143,10 +143,10 @@ class ThreadLocal<T> {
 
 图中左边是栈，右边是堆。线程的一些局部变量和引用使用的内存属于Stack（栈）区，而普通的对象是存储在Heap（堆）区。
 
-* 线程运行时，我们定义的TheadLocal对象被初始化，存储在Heap，同时线程运行的栈区保存了指向该实例的引用，也就是图中的ThreadLocalRef。
-* 当ThreadLocal的set/get被调用时，虚拟机会根据当前线程的引用也就是CurrentThreadRef找到其对应在堆区的实例，然后查看其对用的TheadLocalMap实例是否被创建，如果没有，则创建并初始化。
-* Map实例化之后，也就拿到了该ThreadLocalMap的句柄，那么就可以将当前ThreadLocal对象作为key，进行存取操作。
-* 图中的虚线，表示key对应ThreadLocal实例的引用是个弱引用。
+* 线程运行时，我们定义的 ThreadLocal 对象被初始化，存储在 Heap，同时线程运行的栈区保存了指向该实例的引用，也就是图中的 ThreadLocalRef。
+* 当 ThreadLocal 的 set/get 被调用时，先通过 `Thread.currentThread()` 拿到当前线程对象，再从线程对象里取出它的 `ThreadLocalMap` 字段（`threadLocals`）；如果没有，就创建并初始化。
+* 拿到 `ThreadLocalMap` 之后，以当前 ThreadLocal 对象为 key、业务对象为 value，存进 `Entry` 数组。
+* 图中的虚线，表示 Entry 的 key 对 ThreadLocal 实例是**弱引用**（`WeakReference`），而 value 是强引用。
 ## 强引用弱引用的概念
 
 ThreadLocalMap的key是一个弱引用类型，源代码如下：
@@ -190,8 +190,9 @@ static class ThreadLocalMap {
 
 翻看官网文档的说法：
 
-&gt;To help deal with very large and long-lived usages, the hash table entries use WeakReferences for keys.
-&gt;&gt;为了处理非常大和长期的用途，哈希表条目使用weakreference作为键。
+> To help deal with very large and long-lived usages, the hash table entries use WeakReferences for keys.
+>
+> 为了处理非常多、生命周期很长的使用场景，哈希表条目对 key 使用弱引用。
 
 分两种情况讨论：
 
@@ -199,7 +200,7 @@ static class ThreadLocalMap {
 
 引用ThreadLocal的对象被回收了，但是ThreadLocalMap还持有ThreadLocal的强引用，如果没有手动删除，ThreadLocal不会被回收，导致Entry内存泄漏。
 
-**（2）key 使用弱引**
+**（2）key 使用弱引用**
 
 引用ThreadLocal的对象被回收了，由于ThreadLocalMap持有ThreadLocal的弱引用，即使没有手动删除，ThreadLocal也会被回收。value在下一次ThreadLocalMap调用set、get、remove的时候会被清除。
 

@@ -2,16 +2,17 @@
 
 ## Q：说说Java 注解与自定义注解？
 
+注解（Annotation）是 JDK 5 引入的**元数据**：它本身不含业务逻辑，只是一段可以挂在类、方法、字段、参数上的标记；真正让它“起作用”的是**解析它的代码**——编译期注解处理器，或者运行期通过反射读取注解的框架（Spring、MyBatis、JUnit）。
 
-## 用注解一时爽，一直用一直爽
+一个自定义注解由三部分组成：
 
-Java后端开发进入spring全家桶时代后，开发一个微服务提供简单的增删改查接口跟玩泥巴似的非常简单，一顿操作猛如虎，回头一看代码加了一堆注解：@Controller @Autowired @Value，面向注解编程变成了大家不可缺少的操作。
+| 部分 | 作用 | 例子 |
+| --- | --- | --- |
+| `@interface` 声明 | 定义注解类型 | `public @interface EnableRedisLock` |
+| 注解属性 | 携带参数，只能是基本类型、String、Class、枚举、注解或其数组 | `long expireTime() default 10` |
+| 元注解 | 描述注解本身：用在哪、保留到什么时候、是否进文档、是否可继承 | `@Target`、`@Retention`、`@Documented`、`@Inherited` |
 
-想象一下如果没有注解Java程序员可以要哭瞎😭
-
-既然注解（annotation）这么重要，用的这么爽，那注解的实现原理你知道么？我猜你只会用注解不会自己写注解（手动滑稽）。
-
-好了，下面的内容带大家从零开始写一个注解，揭开注解神秘的面纱。
+下面用一个“Redis 分布式锁注解”把三步走完：定义注解 → 写切面解析 → 在业务方法上使用。
 
 ## 原来注解不神秘
 
@@ -120,45 +121,48 @@ public enum RetentionPolicy {
 在第一步中我们发现定义的注解（@EnableRedisLock）中没有业务逻辑，只有一些变量，别忘了我们的注解是要使能Redis分布式锁的功能，那这个注解到底是怎么实现加锁和释放锁的功能呢？这个就需要我们借助反射的强大功能了。
 ```java
 @Aspect
+@Component
 public class RedisLockAspect {
-    @Around(value = "@annotation(com.smilelioncoder.EnableRedisLock)")
-    public void handleRedisLock(ProceedingJoinPoint joinPoint)
-            throws Throwable {
-        // 通过反射获取到注解对象，可见反射非常重要的
-        EnableRedisLock redisLock = ((MethodSignature) joinPoint.getSignature())
-                .getMethod()
-                .getAnnotation(EnableRedisLock.class);
 
-        // 获取注解对象的变量值
-        String lockKey = redisLock.lockKey();
-        long expireTime = redisLock.expireTime();
-        TimeUnit timeUnit = redisLock.timeUnit();
-        int retryTimes = redisLock.retryTimes();
+    @Around(value = "@annotation(enableRedisLock)")
+    public Object handleRedisLock(ProceedingJoinPoint joinPoint,
+                                  EnableRedisLock enableRedisLock) throws Throwable {
+        // 环绕通知必须返回 Object，并把业务方法的返回值透传出去
+        String lockKey = enableRedisLock.lockKey();
+        long expireTime = enableRedisLock.expireTime();
+        TimeUnit timeUnit = enableRedisLock.timeUnit();
+        int retryTimes = enableRedisLock.retryTimes();
 
-        // 获取锁
-        if (tryLock(lockKey, expireTime, timeUnit, retryTimes)) {
-            try {
-                // 获取锁成功继续执行业务逻辑
-                joinPoint.proceed();
-            } finally {
-                releseLock();
-            }
+        String token = UUID.randomUUID().toString();
+        if (!tryLock(lockKey, token, expireTime, timeUnit, retryTimes)) {
+            throw new IllegalStateException("获取锁失败: " + lockKey);
+        }
+        try {
+            return joinPoint.proceed();
+        } finally {
+            releaseLock(lockKey, token);   // Lua 比对 token 再删除
         }
     }
 }
 ```
 
-这里借助了切面的功能，将EnableRedisLock注解作为一个切点，只要方法上标注了这个注解就会自动执行这里的代码逻辑。
+这里有两个容易写错的地方：
 
-通过反射机制拿到注解对象后就可以执行加锁解锁的常用逻辑啦。Redis实现分布式锁相信大家已经很熟悉了，这里就不在啰嗦了。
+1. **`@Around` 方法的返回值必须是 `Object`**，并且要 `return joinPoint.proceed()`。写成 `void` 会把业务方法的返回值吞掉，调用方拿到 null。
+2. **释放锁要传 key 和 token**，不能无参 `releaseLock()`；删除前用 Lua 校验 token，避免超时后误删别人的锁。
+
+把注解参数直接声明成方法参数（`EnableRedisLock enableRedisLock`）是 Spring AOP 支持的写法，比手动反射 `getAnnotation` 更简洁。
 
 ### 第三步在业务代码中尽情的使用注解
 
 ```java
-@EnableRedisLock(lockKey = "student", expireTime = 10, timeUnit = TimeUnit.SECONDS, retryTimes = 5)
+@EnableRedisLock(lockKey = "'student:' + #student.id", expireTime = 10,
+                 timeUnit = TimeUnit.SECONDS, retryTimes = 5)
 public void method1(Student student) {
     // 这里写业务逻辑
 }
 ```
-在需要加锁的方法上直接加上注解就可以啦，怎么样是不是很简单呀，赶紧在你的项目中运用起来吧。
-好了，自己写一个注解的内容就介绍到这里了，学会了吗？
+
+注意 `#student.id` 是 **SpEL 表达式**，需要切面里用 `SpelExpressionParser` 解析参数值，否则 `lockKey` 会按字面量处理，所有请求都抢同一把锁。简单的做法是先写死 key 做 demo，生产环境一定要按业务维度生成（订单号、用户 ID）。
+
+注解只是“元数据 + 切面逻辑”，真正干活的是切面。理解这一点，自定义注解就不再神秘了。

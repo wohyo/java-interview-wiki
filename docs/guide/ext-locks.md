@@ -118,16 +118,16 @@ Lock lock = new ReentrantLock(false);
 以 synchronized 为例，看一下下面的代码：
 
 ```java
-public synchronized void mehtodA() throws Exception{
+public synchronized void methodA() throws Exception{
 	// Do some magic tings
-	mehtodB();
+	methodB();
 }
 
-public synchronized void mehtodB() throws Exception{
+public synchronized void methodB() throws Exception{
 	// Do some magic tings
 }
 ```
-上面的代码中 methodA 调用 methodB，如果一个线程调用methodA 已经获取了锁再去调用 methodB 就不需要再次获取锁了，这就是可重入锁的特性。如果不是可重入锁的话，mehtodB 可能不会被当前线程执行，可能造成死锁。
+上面的代码中 methodA 调用 methodB，如果一个线程调用methodA 已经获取了锁再去调用 methodB 就不需要再次获取锁了，这就是可重入锁的特性。如果不是可重入锁的话，methodB 可能不会被当前线程执行，可能造成死锁。
 
 ## 自旋锁
 
@@ -152,7 +152,7 @@ CAS 操作如果失败就会一直循环获取当前 value 值然后重试。
 
 另外自适应自旋锁也需要了解一下。
 
-在JDK1.6又引入了自适应自旋，这个就比较智能了，自旋时间不再固定，由前一次在同一个锁上的自旋时间以及锁的拥有者的状态来决定。如果虚拟机认为这次自旋也很有可能再次成功那就会次序较多的时间，如果自旋很少成功，那以后可能就直接省略掉自旋过程，避免浪费处理器资源。
+在JDK1.6又引入了自适应自旋，这个就比较智能了，自旋时间不再固定，由前一次在同一个锁上的自旋时间以及锁的拥有者的状态来决定。如果虚拟机认为这次自旋也很有可能再次成功，就会等待相对更长的时间；如果自旋很少成功，以后可能直接跳过自旋，避免浪费处理器资源。
 
 ## 分段锁
 
@@ -160,7 +160,9 @@ CAS 操作如果失败就会一直循环获取当前 value 值然后重试。
 
 分段锁设计目的是将锁的粒度进一步细化，当操作不需要更新整个数组的时候，就仅仅针对数组中的一项进行加锁操作。
 
-在 Java 语言中 CurrentHashMap 底层就用了分段锁，使用Segment，就可以进行并发使用了。
+在 Java 语言中，JDK 7 的 `ConcurrentHashMap` 用了分段锁：默认 16 个 `Segment`，每个 Segment 继承 `ReentrantLock`，锁住一段 `HashEntry[]`，并发度固定为 16。
+
+JDK 8 已经**弃用 Segment**，改成 `CAS 插入空桶 + synchronized 锁单个桶头`，锁粒度从“一段”细到“一个桶”，并发度随数组长度增长。所以“ConcurrentHashMap 用分段锁”这句话现在只适用于 JDK 7。
 
 ## 锁升级（无锁|偏向锁|轻量级锁|重量级锁）
 
@@ -186,7 +188,7 @@ Java偏向锁(Biased Locking)是指它会偏向于第一个访问锁的线程，
 
 升级到重量级锁其实就是互斥锁了，一个线程拿到锁，其余线程都会处于阻塞等待状态。
 
-在 Java 中，synchronized 关键字内部实现原理就是锁升级的过程：无锁 --&gt; 偏向锁 --&gt; 轻量级锁 --&gt; 重量级锁。这一过程在后续讲解 synchronized 关键字的原理时会详细介绍。
+在 Java 中，synchronized 关键字内部实现原理就是锁升级的过程：无锁 --> 偏向锁 --> 轻量级锁 --> 重量级锁。不过要注意版本变化：**JDK 15（JEP 374）起偏向锁默认禁用并废弃，JDK 18 移除了实现**，所以在 JDK 17/21 上实际路径是“无锁 → 轻量级锁 → 重量级锁”，偏向锁只作为历史知识回答。详细过程见 [synchronized 原理](/guide/t10)。
 
 ## 锁优化技术（锁粗化、锁消除）
 

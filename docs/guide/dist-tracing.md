@@ -21,15 +21,15 @@
 * **链路分析**：通过分析链路耗时、服务依赖关系可以得到用户的行为路径，汇总分析应用在很多业务场景。
 ## Q：说说链路追踪基本原理？
 
-链路追踪系统（可能）最早是由Goggle公开发布的一篇论文《Dapper, a Large-Scale Distributed Systems Tracing Infrastructure》被大家广泛熟悉，所以各位技术大牛们如果有黑武器不要藏起来赶紧去发表论文吧。
+链路追踪系统最早由 Google 公开发布的论文《Dapper, a Large-Scale Distributed Systems Tracing Infrastructure》为大家所熟悉。
 
-在这篇著名的论文中主要讲述了Dapper链路追踪系统的基本原理和关键技术点。接下来挑几个重点的技术点详细给大家介绍一下。
+这篇论文讲了 Dapper 的基本原理和关键技术点，下面挑几个重点介绍。
 
 ### Trace
 
 Trace的含义比较直观，就是链路，指一个请求经过所有服务的路径，可以用下面树状的图形表示。
 
-图中一条完整的链路是：chrome -&gt; 服务A -&gt; 服务B -&gt; 服务C -&gt; 服务D -&gt; 服务E -&gt; 服务C -&gt; 服务A -&gt; chrome。服务间经过的局部链路构成了一条完整的链路，其中每一条局部链路都用一个全局唯一的traceid来标识。
+图中一条完整的链路是：chrome -> 服务A -> 服务B -> 服务C -> 服务D -> 服务E -> 服务C -> 服务A -> chrome。服务间经过的局部链路构成了一条完整的链路，其中每一条局部链路都用一个全局唯一的 traceId 来标识。
 
 ### Span
 
@@ -37,9 +37,9 @@ Trace的含义比较直观，就是链路，指一个请求经过所有服务的
 
 为了表达这种父子关系引入了Span的概念。
 
-同一层级parent id相同，span id不同，span id从小到大表示请求的顺序，从下图中可以很明显看出服务A是先调了服务B然后再调用了C。
+同一层级的 span 共享同一个 parent id、各自的 span id 不同。**调用先后看 start time，不是看 span id 大小**——span id 只是唯一标识，没有顺序语义。下图中通过时间戳可以看出服务 A 先调服务 B、再调服务 C。
 
-上下层级代表调用关系，如下图服务C的span id为2，服务D的parent id为2，这就表示服务C和服务D形成了父子关系，很明显是服务C调用了服务D。
+上下层级代表调用关系，如下图服务 C 的 span id 为 2，服务 D 的 parent id 为 2，表示服务 C 调用了服务 D。
 
 **总结：通过事先在日志中埋点，找出相同traceId的日志，再加上parent id和span id就可以将一条完整的请求调用链串联起来。**
 
@@ -47,11 +47,12 @@ Trace的含义比较直观，就是链路，指一个请求经过所有服务的
 
 Dapper中还定义了annotation的概念，用于用户自定义事件，用来辅助定位问题。
 
-**通****常****包含四个注解信息**：
-cs：Client Start，表示客户端发起请求；
-sr：ServerReceived，表示服务端收到请求；
-ss： Server Send，表示服务端完成处理，并将结果发送给客户端；
-cr：ClientReceived，表示客户端获取到服务端返回信息；
+通常包含四个注解信息：
+
+- `cs`（Client Start）：客户端发起请求；
+- `sr`（Server Received）：服务端收到请求；
+- `ss`（Server Send）：服务端处理完成，发送响应；
+- `cr`（Client Received）：客户端收到响应。
 
 上图中描述了一次请求和响应的过程，四个点也就是对应四个Annotation事件。
 

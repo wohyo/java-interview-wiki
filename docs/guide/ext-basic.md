@@ -204,16 +204,16 @@ Math类中提供了三个与取整有关的方法：ceil、floor、round，这�
 
 这四个作用域的可见范围如下表所示。
 
-说明：如果在修饰的元素上面没有写任何访问修饰符，则表示friendly。
+说明：没有写任何访问修饰符时是**包私有**（package-private），不是关键字 `friendly`（`friendly` 只是早期文档里的俗称，Java 没有这个关键字）。
 
-| 作用域     | 当前类 | 同一package | 子孙类 | 其他package |
+| 修饰符 | 当前类 | 同一 package | 不同包的子类 | 其他 package |
 |:----------|:------|:-----------|:------|:-----------|
 | public    | √     | √          | √    | √          |
-| protected | √     | √          | √    | ×          |
-| friendly  | √     | √          | ×     | ×          |
+| protected | √     | √          | √（只能通过继承访问，且不能访问其他实例的同名成员） | ×          |
+| 默认（包私有） | √     | √          | ×     | ×          |
 | private   | √     | ×         | ×     | ×          |
 
-备注：只要记住了有4种访问权限，4个访问范围，然后将全选和范围在水平和垂直方向上分别按排从小到大或从大到小的顺序排列，就很容易画出上面的图了。
+`protected` 是唯一容易被记错的：它比包私有多了“跨包子类可继承访问”，但**不是**“跨包随便访问”。在子类里 `this.protectedField` 可以，`new Parent().protectedField` 不行（除非是子类自身类型的引用）。
 
 ## Q：Overload和Override的区别。Overloaded的方法是否可以改变返回值的类型?
 
@@ -511,25 +511,41 @@ public class Test {
 
 ## Q：说说final, finally, finalize的区别？
 
-final 用于声明属性，方法和类，分别表示属性不可变，方法不可覆盖，类不可继承。
+final 用于声明属性、方法和类，分别表示引用不可变（不是对象内容不可变）、方法不可覆盖、类不可继承。
 
-内部类要访问局部变量，局部变量必须定义成final类型。
+局部变量与内部类：JDK 8 之前，局部内部类访问的局部变量必须显式声明为 `final`；JDK 8 起只要变量**事实上不再被赋值**（effectively final）即可，不用写 `final`。Lambda 同理。
 
-finally是异常处理语句结构的一部分，表示总是执行。
+finally 是异常处理结构的一部分，表示“无论正常返回还是异常退出都执行”（`System.exit` 等极端情况除外）。
 
-finalize是Object类的一个方法，在垃圾收集器执行的时候会调用被回收对象的此方法，可以覆盖此方法提供垃圾收集时的其他资源回收，例如关闭文件等。JVM不保证此方法总被调用
+finalize 是 `Object` 的方法，GC 回收对象前可能调用一次。它**已被废弃**：JDK 9 标记 `@Deprecated`，JDK 18 起 finalization 默认关闭（JEP 421），执行时机不确定、可能不执行、还会拖慢 GC。资源释放请用 try-with-resources 或 `Cleaner`，不要依赖 `finalize`。
 
 ## Q：请写出你最常见到的5个runtime exception？
 
 这道题主要考你的代码量到底多大，如果你长期写代码的，应该经常都看到过一些系统方面的异常，你不一定真要回答出5个具体的系统异常，但你要能够说出什么是系统异常，以及几个系统异常就可以了，当然，这些异常完全用其英文名称来写是最好的，如果实在写不出，那就用中文吧，有总比没有强！
 
-所谓系统异常，就是…..，它们都是RuntimeException的子类，在jdk doc中查RuntimeException类，就可以看到其所有的子类列表，也就是看到了所有的系统异常。我比较有印象的系统异常有：NullPointerException、ArrayIndexOutOfBoundsException、ClassCastException。
+所谓运行时异常（unchecked exception），是 `RuntimeException` 及其子类。编译器不强制 catch 或 throws，通常代表程序写错了（空指针、越界、类型转换错误、非法参数），应该在开发阶段暴露并修复，而不是靠异常处理兜底。
+
+常见的有：
+
+| 异常 | 触发场景 |
+| --- | --- |
+| `NullPointerException` | 调用 null 的方法/字段 |
+| `ArrayIndexOutOfBoundsException` | 数组下标越界 |
+| `ClassCastException` | 强转类型不匹配 |
+| `IllegalArgumentException` | 参数不合法 |
+| `NumberFormatException` | 字符串转数字失败 |
+| `ArithmeticException` | 整数除以 0 |
+| `UnsupportedOperationException` | 调用了不支持的操作（如不可变集合的 add） |
+| `ConcurrentModificationException` | 遍历中修改集合 |
 
 ## Q：java中有几种类型的流？JDK为每种类型的流提供了一些抽象类以供继承，请说出他们分别是哪些类？
 
-字节流，字符流。
+两大类：**字节流**和**字符流**。
 
-字节流继承于InputStream OutputStream，字符流继承于InputStreamReader OutputStreamWriter。在java.io包中还有许多其他的流，主要是为了提高性能和使用方便。
+- 字节流：抽象基类是 `InputStream` / `OutputStream`，每次读写一个或多个字节，适合图片、音频、压缩包等二进制数据；
+- 字符流：抽象基类是 `Reader` / `Writer`，每次读写字符，内部处理编码，适合文本。
+
+`InputStreamReader` / `OutputStreamWriter` 不是字符流的基类，而是**字节流到字符流的桥接器**：它们继承自 `Reader` / `Writer`，内部持有一个 `InputStream` / `OutputStream`，按指定字符集把字节解码成字符（或反过来）。常见组合是 `BufferedReader(new InputStreamReader(new FileInputStream(...), StandardCharsets.UTF_8))`。
 
 ## Q：说说字节流与字符流的区别？
 
@@ -541,8 +557,9 @@ finalize是Object类的一个方法，在垃圾收集器执行的时候会调用
 
 字符向字节转换时，要注意编码的问题，因为字符串转成字节数组，其实是转成该字符的某种编码的字节形式，读取也是反之的道理。
 
-```java
 字节流与字符流关系的代码案例：
+
+```java
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -600,22 +617,16 @@ assertion(断言)在软件开发中是一种常用的调试方式，很多开发
 assertion检查通常在开发和测试时开启。为了提高性能，在软件发布后，assertion检查通常是关闭的。
 
 ```java
-package com.huawei.interview;
 public class AssertTest {
-	/**
-	 * @param args
-	 */
-	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-		int i = 0;
-		for(i=0;i<5;i++)
-		{
-			System.out.println(i);
-		}
-		//假设程序不小心多了一句--i;
-		--i;
-		assert i==5;		
-	}
+    public static void main(String[] args) {
+        int i = 0;
+        for (i = 0; i < 5; i++) {
+            System.out.println(i);
+        }
+        // 假设程序不小心多了一句 --i;
+        --i;
+        assert i == 5 : "i 应该等于 5，实际是 " + i;
+    }
 }
 ```
 
@@ -624,56 +635,24 @@ public class AssertTest {
 所谓内存泄露就是指一个不再被程序使用的对象或变量一直被占据在内存中。java中有垃圾回收机制，它可以保证一对象不再被引用的时候，即对象编程了孤儿的时候，对象将自动被垃圾回收器从内存中清除掉。由于Java 使用有向图的方式进行垃圾回收管理，可以消除引用循环的问题，例如有两个对象，相互引用，只要它们和根进程不可达的，那么GC也是可以回收它们的，例如下面的代码可以看到这种情况的内存回收：
 
 ```java
-package com.huawei.interview;
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 public class GarbageTest {
-	/**
-	 * @param args
-	 * @throws IOException
-	 */
-	public static void main(String[] args) throws IOException {
-		// TODO Auto-generated method stub
-		try {
-			gcTest();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		System.out.println("has exited gcTest!");
-		System.in.read();
-		System.in.read();		
-		System.out.println("out begin gc!");		
-		for(int i=0;i<100;i++)
-		{
-			System.gc();
-			System.in.read();	
-			System.in.read();	
-		}
-	}
-	private static void gcTest() throws IOException {
-		System.in.read();
-		System.in.read();		
-		Person p1 = new Person();
-		System.in.read();
-		System.in.read();		
-		Person p2 = new Person();
-		p1.setMate(p2);
-		p2.setMate(p1);
-		System.out.println("before exit gctest!");
-		System.in.read();
-		System.in.read();		
-		System.gc();
-		System.out.println("exit gctest!");
-	}
-	private static class Person
-	{
-		byte[] data = new byte[20000000];
-		Person mate = null;
-		public void setMate(Person other)
-		{
-			mate = other;
-		}
-	}
+    // 长生命周期的静态集合
+    private static final List<Person> CACHE = new ArrayList<>();
+
+    public static void main(String[] args) {
+        Person p = new Person();
+        CACHE.add(p);          // 缓存持有引用
+        p = null;              // 业务代码已经不再使用
+        System.gc();           // 回收不掉：CACHE 还引用着它
+        System.out.println("cache size = " + CACHE.size());
+    }
+
+    static class Person {
+        byte[] data = new byte[20 * 1024 * 1024];   // 约 20MB
+    }
 }
 ```
 Java中的内存泄露的情况：长生命周期的对象持有短生命周期对象的引用就很可能发生内存泄露，尽管短生命周期对象已经不再需要，但是因为长生命周期对象持有它的引用而导致不能被回收，这就是Java中内存泄露的发生场景，通俗地说，就是程序员可能创建了一个对象，以后一直不再使用这个对象，这个对象却一直被引用，即这个对象无用但是却无法被垃圾回收器回收的，这就是Java中可能出现内存泄露的情况，例如，缓存系统，我们加载了一个对象放在缓存中(例如放在一个全局map对象中)，然后一直不再使用它，这个对象一直被缓存引用，但却不再被使用。
@@ -727,28 +706,22 @@ public class Bad{
 
 ## Q：能不能自己写个类，也叫java.lang.String？
 
-可以，但在应用的时候，需要用自己的类加载器去加载，否则，系统的类加载器永远只是去加载jre.jar包中的那个java.lang.String。由于在tomcat的web应用程序中，都是由webapp自己的类加载器先自己加载WEB-INF/classess目录中的类，然后才委托上级的类加载器加载，如果我们在tomcat的web应用程序中写一个java.lang.String，这时候Servlet程序加载的就是我们自己写的java.lang.String，但是这么干就会出很多潜在的问题，原来所有用了java.lang.String类的都将出现问题。
+不能（在正常的 JVM 上）。
 
-虽然java提供了endorsed技术，可以覆盖jdk中的某些类，具体做法是….。但是，能够被覆盖的类是有限制范围，反正不包括java.lang这样的包中的类。例如，运行下面的程序：
+原因不在双亲委派，而在更底层：`ClassLoader.defineClass` 在定义类之前会检查包名，`java.*` 开头的包直接拒绝，抛出：
 
-```java
-package java.lang;
-public class String {
-	/**
-	 * @param args
-	 */
-	public static void main(String[] args) {
-		// TODO Auto-generated method stub
-		System.out.println("string");
-	}
-}
+```text
+java.lang.SecurityException: Prohibited package name: java.lang
 ```
-报告的错误如下：
-java.lang.NoSuchMethodError: main
 
-Exception in thread "main"
+即使你自定义一个类加载器、绕过双亲委派，也过不了这道检查。这是 JVM 保护核心类库的第二道防线。
 
-这是因为加载了jre自带的java.lang.String，而该类中没有main方法。
+另外两条路也走不通：
+
+- JDK 8 及之前可以用 `-Xbootclasspath/p:` 把类插到启动类路径前面，但那是“替换 JDK 自带的类”，不是“在应用里定义同名类”，而且 JDK 9 模块化后该参数被移除；
+- 早期 `endorsed` 目录（`-Djava.endorsed.dirs`）也已在 JDK 9 移除，且本来就不允许覆盖 `java.lang`。
+
+所以“自定义 `java.lang.String` 覆盖 JDK”这个说法是错的。Tomcat 的 `WebappClassLoader` 虽然对应用类“先自己加载”，但对 `java.*`、`javax.*` 等包仍然强制委托给父加载器，正是为了避免这类问题。
 
 ## Q：获得一个类的类对象有哪些方式？
 

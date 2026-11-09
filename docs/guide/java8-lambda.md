@@ -2,8 +2,9 @@
 
 ## Q：说说Java 8 函数式接口与 Lambda？
 
-&gt;Java8 由Oracle在2014年发布，是继Java5之后最具革命性的版本了。
-&gt;Java8吸收其他语言的精髓带来了函数式编程，lambda表达式，Stream流等一系列新特性，学会了这些新特性，可以让你实现高效编码优雅编码。
+> Java 8 由 Oracle 在 2014 年发布，是继 Java 5 之后最具革命性的版本。
+>
+> Java 8 吸收其他语言的精髓，带来了函数式编程、lambda 表达式、Stream 流等一系列新特性。
 ## 1. Lambda表达式小试牛刀
 
 Lambada表达式可以理解为：可传递的匿名函数的一种简洁表达方式。Lambda表达式没有名称，同普通方法一样有参数列表、函数主体、返回类型等；
@@ -103,13 +104,13 @@ java8 中常用函数式接口，针对基本类型java还定义了IntPredicate,
 
 ### （5）将lambda表达式重构为方法引用
 
-方法引用可以看作是lambda表达式的一种快捷写法，它可以调用特性的方法作为参数传递。你也可以将方法引用看作是lambda表达式的语法糖，让lambda表达式写起来更加简介。举个栗子，按学生年龄排序：
+方法引用可以看作是 lambda 表达式的一种快捷写法：当 lambda 只是“原样调用某个已有方法”时，可以省掉参数列表，直接写方法引用。它让代码更简洁，也更容易读。举个栗子，按学生年龄排序：
 
 ```java
 // before
-students.sort((s1, s2) -> s1.getAge.compareTo(s2.getAge()))));
+students.sort((s1, s2) -> s1.getAge().compareTo(s2.getAge()));
 // after 使用方法引用
-students.sort(Comparator.comparing(Student::getAge()))));
+students.sort(Comparator.comparing(Student::getAge));
 ```
 
 方法引用主要有三类：
@@ -134,8 +135,10 @@ String str = "hello java8";
 
 最后我们将三类方法引用归纳如下：
 
-|lambda表达式|方法引用|    |
+| lambda 表达式 | 方法引用 | 类型 |
 |:----|:----|:----|
-|(args) -&gt; ClassName.staticMethod(args)|ClassName::staticMethod|静态方法方法引用|
-|(arg0, params) -&gt; arg0.instanceMethod(params)|ClassName::instanceMethod|内部实例方法引用|
-|arg0<br>(params) -&gt; arg0.instanceMethod(params)|arg0.instanceMethod|外部实例方法引用|
+| `args -> ClassName.staticMethod(args)` | `ClassName::staticMethod` | 静态方法引用 |
+| `(arg0, params) -> arg0.instanceMethod(params)` | `ClassName::instanceMethod` | 任意对象的实例方法引用 |
+| `() -> arg0.instanceMethod()` | `arg0::instanceMethod` | 特定对象的实例方法引用 |
+| `args -> new ClassName(args)` | `ClassName::new` | 构造器引用 |
+| `args -> String[]::new` | `String[]::new` | 数组构造器引用 |

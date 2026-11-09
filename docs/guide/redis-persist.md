@@ -104,7 +104,7 @@ auto-aof-rewrite-percentage：代表当前AOF文件空间 （aof_current_size）
 
 自动触发时机
 
-当aof_current_size&gt;auto-aof-rewrite-minsize 并且（aof_current_size-aof_base_size）/aof_base_size&gt;=auto-aof-rewritepercentage。
+当 `aof_current_size > auto-aof-rewrite-min-size` 并且 `(aof_current_size - aof_base_size) / aof_base_size >= auto-aof-rewrite-percentage` 时自动触发。
 
 其中aof_current_size和aof_base_size可以在info Persistence统计信息中查看。
 
@@ -124,7 +124,7 @@ AOF文件重写后为什么会变小？
 
 （3）加载AOF/RDB文件成功后，Redis启动成功。
 
-（4）AOF/RDB文件存在错误时，Redis启动失败并打印错误信息。
+（4）AOF 文件**尾部**被截断（如写盘时宕机）时，`aof-load-truncated yes`（默认）会加载截断点之前的数据并打印警告；文件**中间**损坏时则启动失败，需要用 `redis-check-aof --fix` 修复。RDB 文件损坏通常直接启动失败，需要 `redis-check-rdb`。
 
 ### RDB和AOF的优缺点
 
@@ -152,26 +152,53 @@ AOF文件重写后为什么会变小？
 * 对于相同的数据集来说，AOF 文件的体积通常要大于 RDB 文件的体积。
 * 数据恢复（load）时AOF比RDB慢，通常RDB 可以提供更有保证的最大延迟时间。
 
-**RDB和AOF简单对比总结**
+**RDB和AOF简单对比**
 
-RDB优点：
+| 维度 | RDB | AOF |
+| --- | --- | --- |
+| 文件内容 | 二进制快照 | 命令日志（RESP 协议文本） |
+| 体积 | 小 | 大（重写后接近 RDB） |
+| 恢复速度 | 快 | 慢 |
+| 数据安全性 | 差（可能丢几分钟） | 好（默认最多丢 1 秒） |
+| 写性能影响 | fork 时有抖动 | 持续追加，`everysec` 影响小 |
+| 适用 | 冷备、全量复制、灾难恢复 | 数据不能丢、误删恢复 |
 
-* RDB 是紧凑的二进制文件，比较适合备份，全量复制等场景
-* RDB 恢复数据远快于 AOF
+### 混合持久化：RDB + AOF
 
-RDB缺点：
+Redis 4.0 引入 `aof-use-rdb-preamble`：AOF 重写时，新文件以 **RDB 格式的快照开头**，后面追加重写期间的增量 AOF 命令：
 
-* RDB 无法实现实时或者秒级持久化；
-* 新老版本无法兼容 RDB 格式。
+```
+aof 文件 = [RDB 快照（全量）] + [AOF 增量命令]
+```
 
-AOF优点：
+- 恢复时先加载 RDB 部分，再回放增量命令，**比纯 AOF 快得多**；
+- 文件体积也比纯 AOF 小；
+- 兼容性：老版本 Redis 无法读取带 RDB 前缀的 AOF。
 
-* 可以更好地保护数据不丢失；
-* appen-only 模式写入性能比较高；
-* 适合做灾难性的误删除紧急恢复。
+### Redis 7.0 的 Multi-Part AOF
 
-AOF缺点：
+Redis 7.0 把单个 AOF 文件拆成**多个文件**，放在 `appenddirname` 目录下：
 
-* 对于同一份文件，AOF 文件要比 RDB 快照大；
-* AOF 开启后，会对写的 QPS 有所影响，相对于 RDB 来说 写 QPS 要下降；
-* 数据库恢复比较慢， 不合适做冷备。
+```
+appendonlydir/
+├── appendonly.aof.1.base.rdb      ← 基础快照（RDB 或 AOF 格式）
+├── appendonly.aof.1.incr.aof      ← 增量命令
+└── appendonly.aof.manifest        ← 清单文件，记录文件顺序
+```
+
+好处：
+
+1. 重写不再需要“旧文件 + 新文件”同时存在，减少磁盘峰值；
+2. 增量文件可以滚动，避免单文件过大；
+3. 打开文件、加载顺序由 manifest 管理，更清晰。
+
+### 怎么选
+
+| 场景 | 建议 |
+| --- | --- |
+| 纯缓存，能接受丢数据 | 只开 RDB（或干脆关闭持久化） |
+| 缓存 + 少量重要数据 | RDB + AOF，`appendfsync everysec` |
+| 数据不能丢 | AOF `everysec` + 主从 + 定期 RDB 备份 |
+| 追求恢复速度 | 开混合持久化（`aof-use-rdb-preamble yes`） |
+
+生产上常见的组合是：**主从 + AOF everysec + 定期 RDB 冷备**。AOF 保证秒级不丢，RDB 用于快速恢复和异地备份，主从用于故障切换。

@@ -60,7 +60,34 @@ slaveof命令是异步的，在从节点上执行slaveof命令，从节点立即
 
 主从节点之间的连接建立以后，便可以开始进行数据同步，该阶段可以理解为从节点数据的初始化。具体执行的方式是：从节点向主节点发送psync命令（Redis2.8以前是sync命令），开始同步。
 
-数据同步阶段是主从复制最核心的阶段，根据主从节点当前状态的不同，可以分为全量复制和部分复制，后面再讲解这两种复制方式以及psync命令的执行过程，这里不再详述。
+数据同步阶段是主从复制最核心的阶段，根据主从节点当前状态的不同，分为**全量复制**和**部分复制**。
+
+**全量复制**（首次同步或差距过大）：
+
+```
+① 从节点发送 psync ? -1
+② 主节点回复 +FULLRESYNC <runid> <offset>，并 fork 子进程生成 RDB
+③ 主节点把 RDB 发给从节点，从节点清空旧数据后加载
+④ 主节点把生成 RDB 期间新产生的写命令存入 repl_backlog，RDB 发完后补发
+```
+
+**部分复制**（断线重连）：
+
+```
+① 从节点发送 psync <runid> <offset>
+② 主节点检查 runid 是否匹配、offset 是否还在 repl_backlog 范围内
+③ 是 → 回复 +CONTINUE，只补发 offset 之后的命令
+④ 否 → 退化为全量复制
+```
+
+两个关键参数：
+
+| 参数 | 作用 | 默认 |
+| --- | --- | --- |
+| `repl-backlog-size` | 复制积压缓冲区大小，决定断线后能补发多少数据 | 1MB |
+| `repl-backlog-ttl` | 从节点全部断开后，backlog 保留多久 | 3600 秒 |
+
+`repl_backlog` 是环形缓冲区，写满后旧数据被覆盖——覆盖了就只能全量复制。写流量大时要调大（如 64~256MB）。
 
 ##### 命令传播阶段
 
@@ -94,7 +121,7 @@ Redis Sentinel 是一个特殊的 Redis 节点。在哨兵模式创建时，需�
 
 （2）Sentinel与Sentinel
 
-基于 Redis 的订阅发布功能， 每个 Sentinel 节点会向主节点的 __sentinel__：hello 频道上发送该 Sentinel 节点对于主节点的判断以及当前 Sentinel 节点的信息 ，同时每个 Sentinel 节点也会订阅该频道， 来获取其他 Sentinel 节点的信息以及它们对主节点的判断。
+基于 Redis 的订阅发布功能， 每个 Sentinel 节点会向主节点的 `__sentinel__:hello` 频道上发送该 Sentinel 节点对于主节点的判断以及当前 Sentinel 节点的信息 ，同时每个 Sentinel 节点也会订阅该频道， 来获取其他 Sentinel 节点的信息以及它们对主节点的判断。
 
 通过以上两步所有的 Sentinel 节点以及它们与所有的 Redis 节点之间都已经彼此感知到，之后每个 Sentinel 节点会向主节点、从节点、以及其余 Sentinel 节点定时发送 ping 命令作为心跳检测， 来确认这些节点是否可达。
 
@@ -104,7 +131,7 @@ Redis Sentinel 是一个特殊的 Redis 节点。在哨兵模式创建时，需�
 
 之后该 Sentinel 节点会通过 sentinel ismaster-down-by-addr 命令向其他 Sentinel 节点询问对主节点的判断， 当 quorum（法定人数） 个 Sentinel 节点都认为该节点故障时，则执行**客观下线**，即认为该节点已经不可用。这也同时解释了为什么必须需要一组 Sentinel 节点，因为单个 Sentinel 节点很容易对故障状态做出误判。
 
-&gt;这里 quorum 的值是我们在哨兵模式搭建时指定的，后文会有说明，通常为 Sentinel节点总数/2+1，即半数以上节点做出主观下线判断就可以执行客观下线。
+> 这里 quorum 的值是我们在哨兵模式搭建时指定的，后文会有说明，通常为 Sentinel 节点总数/2+1，即半数以上节点做出主观下线判断就可以执行客观下线。
 
 因为故障转移的工作只需要一个 Sentinel 节点来完成，所以 Sentinel 节点之间会再做一次选举工作， 基于 Raft 算法选出一个 Sentinel 领导者来进行故障转移的工作。
 
@@ -113,11 +140,11 @@ Redis Sentinel 是一个特殊的 Redis 节点。在哨兵模式创建时，需�
 （1）在从节点列表中选出一个节点作为新的主节点
 
 * 过滤不健康或者不满足要求的节点；
-* 选择 slave-priority（优先级）最高的从节点， 如果存在则返回， 不存在则继续；
+* 选择 `replica-priority`（从节点优先级，旧称 `slave-priority`，默认 100）最高的从节点， 如果存在则返回， 不存在则继续；
 * 选择复制偏移量最大的从节点 ， 如果存在则返回， 不存在则继续；
 * 选择 runid 最小的从节点。
 
-（2）Sentinel 领导者节点会对选出来的从节点执行 slaveof no one 命令让其成为主节点。
+（2）Sentinel 领导者节点会对选出来的从节点执行 `replicaof no one` 命令（旧称 `slaveof no one`）让其成为主节点。
 
 （3）Sentinel 领导者节点会向剩余的从节点发送命令，让他们从新的主节点上复制数据。
 
@@ -145,9 +172,46 @@ Redis-Cluster采用无中心结构，每个节点都保存数据，节点之间�
 
 ##### Redis集群数据分片
 
-## Q：说说常见应用场景？
+Redis Cluster 没有使用一致性哈希，而是把整个键空间固定切成 **16384 个哈希槽（slot）**：
 
-todo
+```
+slot = CRC16(key) % 16384
+```
+
+每个主节点负责一部分槽，槽的分配可以手动指定，也可以让 `redis-cli --cluster` 自动均分。3 主集群通常是 0-5460、5461-10922、10923-16383。
+
+**为什么是 16384**：节点间心跳包要携带槽位图（bitmap），16384 bit = 2KB，带宽可接受；槽太多心跳包变大，槽太少分布不均。这是作者在“心跳开销”和“分片粒度”之间的选择。
+
+客户端访问的 key 不在当前节点时：
+
+| 情况 | 响应 | 客户端动作 |
+| --- | --- | --- |
+| key 属于其他节点的槽 | `MOVED <slot> <ip:port>` | 更新本地槽位缓存，重定向到目标节点 |
+| 槽正在迁移中 | `ASK <slot> <ip:port>` | 只对本次请求重定向，不更新缓存 |
+
+集群扩容/缩容时，槽会逐个迁移：`CLUSTER SETSLOT <slot> IMPORTING/MIGRATING` + `MIGRATE` 命令搬数据。迁移过程中客户端可能收到 ASK，所以要有重定向处理（主流客户端都已内置）。
+
+另外，Cluster 模式要求**同一个事务/同一批多 key 操作涉及的 key 在同一个槽**，用 `{tag}` 强制同槽：
+
+```bash
+SET {order:1001}:status paid
+SET {order:1001}:amount 99
+# 大括号里的内容相同 → CRC16 相同 → 落在同一个槽
+```
+
+### 常见应用场景
+
+| 场景 | 数据结构 | 高可用要求 |
+| --- | --- | --- |
+| 缓存（商品、用户、配置） | String / Hash | 主从 + 哨兵即可，能容忍少量丢失 |
+| 分布式锁 | String（SET NX PX）+ Lua | 主从异步复制有丢锁风险，强一致场景用 RedLock 或 ZK |
+| 排行榜 / 延时队列 | ZSet | 主从 + 哨兵 |
+| 会话共享 | Hash / String | 集群模式，避免单点 |
+| 计数器 / 限流 | String（INCR）、Lua | 单 key 热点，必要时分片 |
+| 消息队列 | List / Stream | 优先用专业 MQ，Redis 适合轻量场景 |
+| 附近的人 / 签到 | GEO / Bitmap | 集群模式 |
+
+选型顺序：**先看数据量和并发，再看一致性要求**。数据量小于单机内存、读多写少，主从 + 哨兵最省事；数据量超过单机、写并发高，再上 Cluster。
 
 ## 实战篇
 
@@ -256,7 +320,7 @@ docker exec -it redis-server-02 redis-cli # 连接实例2
 127.0.0.1:6379> get name
 "ray" # 可以查到，表明从实例已经将主实例的数据同步过来了
 ```
---- 至此redis主从复制实例搭建和测试完毕，小伙伴们学会了吗。
+至此，主从复制搭建和验证完成。
 ### 使用docker搭建redis主从复制+哨兵模式
 
 搭建三个Sentinel实例+Redis实例
@@ -275,8 +339,9 @@ docker exec -it redis-server-02 redis-cli # 连接实例2
 
 打开所有的配置文件，修改如下配置项：
 
-* 关闭保护模式 protected-mode no
-* 配置redis主实例ip和端口 sentinel monitor mymaster 172.17.0.4 6379 1 -配置日志文件  logfile "sentinel.log"
+* 关闭保护模式 `protected-mode no`
+* 配置 Redis 主实例 ip 和端口：`sentinel monitor mymaster 172.17.0.4 6379 1`
+* 配置日志文件：`logfile "sentinel.log"`
 #### 2. 启动sentinel哨兵实例
 
 ```plain
@@ -323,4 +388,4 @@ sentinel_simulate_failure_flags:0
 master0:name=mymaster,status=ok,address=172.17.0.3:6379,slaves=2,sentinels=3
 ```
 根据回显可以看出主ip已经换为172.17.0.3
---- 至此哨兵模式已经测试完毕。
+至此，哨兵模式的故障转移验证完成。
