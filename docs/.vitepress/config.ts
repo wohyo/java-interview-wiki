@@ -6,8 +6,8 @@ const isBuild = process.env.NODE_ENV === 'production'
 const base = process.env.VP_BASE || (isBuild ? '/java-interview-wiki/' : '/')
 
 export default withPwa(defineConfig({
-  title: 'Java 面试知识点',
-  description: 'Java 高频面试知识点（深度问答版）整理',
+  title: 'Java 知识手册',
+  description: 'Java 知识手册：53 个专题，按基础、追问、深度层层递进',
   lang: 'zh-CN',
   base,
   lastUpdated: true,
@@ -18,11 +18,11 @@ export default withPwa(defineConfig({
     ['meta', { name: 'theme-color', content: '#1d4ed8' }],
     ['meta', { name: 'apple-mobile-web-app-capable', content: 'yes' }],
     ['meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }],
-    ['meta', { name: 'apple-mobile-web-app-title', content: 'Java 面试知识点' }],
+    ['meta', { name: 'apple-mobile-web-app-title', content: 'Java 知识手册' }],
   ],
 
   themeConfig: {
-    siteTitle: 'Java 面试知识点',
+    siteTitle: 'Java 知识手册',
     nav: [
       { text: '首页', link: '/' },
       { text: 'Java 基础', link: '/guide/t01' },
@@ -71,9 +71,9 @@ export default withPwa(defineConfig({
   pwa: {
     registerType: 'autoUpdate',
     manifest: {
-      name: 'Java 面试知识点',
-      short_name: 'Java 面试',
-      description: 'Java 高频面试知识点整理',
+      name: 'Java 知识手册',
+      short_name: 'Java 手册',
+      description: 'Java 知识手册：53 个专题，按基础、追问、深度层层递进',
       lang: 'zh-CN',
       theme_color: '#1d4ed8',
       background_color: '#0f172a',

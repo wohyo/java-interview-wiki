@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: Java 面试知识点
+  name: Java 知识手册
   tagline: 53 个专题，按「基础 → 追问 → 深度」层层递进
   actions:
     - theme: brand
