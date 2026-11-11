@@ -23,6 +23,7 @@ export default withPwa(defineConfig({
 
   themeConfig: {
     siteTitle: 'Java 知识手册',
+    logo: '/logo.svg',
     nav: [
       { text: '首页', link: '/' },
       { text: 'Java 基础', link: '/guide/t01' },
