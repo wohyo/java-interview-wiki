@@ -94,5 +94,12 @@ export default withPwa(defineConfig({
 
   markdown: {
     lineNumbers: true,
+    container: {
+      tipLabel: '提示',
+      infoLabel: '信息',
+      warningLabel: '注意',
+      dangerLabel: '危险',
+      detailsLabel: '详情',
+    },
   },
 }))

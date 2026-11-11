@@ -148,8 +148,11 @@ public class RedisLockAspect {
 
 这里有两个容易写错的地方：
 
+::: danger
 1. **`@Around` 方法的返回值必须是 `Object`**，并且要 `return joinPoint.proceed()`。写成 `void` 会把业务方法的返回值吞掉，调用方拿到 null。
 2. **释放锁要传 key 和 token**，不能无参 `releaseLock()`；删除前用 Lua 校验 token，避免超时后误删别人的锁。
+
+:::
 
 把注解参数直接声明成方法参数（`EnableRedisLock enableRedisLock`）是 Spring AOP 支持的写法，比手动反射 `getAnnotation` 更简洁。
 

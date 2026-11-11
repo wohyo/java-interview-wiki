@@ -35,7 +35,10 @@ max.in.flight.requests.per.connection=5   # 幂等开启时最多 5，保证顺�
 
 网络超时后 Producer 会重试，Broker 可能已经写入成功——重试就重复了。幂等生产者给每条消息带 `<PID, epoch, sequence>`，Broker 按 sequence 去重，保证**单分区、单会话内**不重复。
 
-注意：幂等只解决“重试导致的重复”，不解决“跨分区/跨会话”的 exactly once，那需要事务。
+::: warning
+幂等只解决“重试导致的重复”，不解决“跨分区/跨会话”的 exactly once，那需要事务。
+
+:::
 
 ### 生产端还会怎么丢
 
@@ -85,12 +88,15 @@ enable.auto.commit=true
 auto.commit.interval.ms=5000
 ```
 
+::: danger
 自动提交是**按时间**提交 offset，不是“处理完才提交”：
 
 ```
 poll 一批消息 → 处理了 3 条（共 10 条）→ 到了 5 秒，自动提交 offset=10
 → 消费者崩溃 → 重启从 offset=10 开始 → 剩下 7 条丢了
 ```
+
+:::
 
 ### 正确姿势：手动提交
 

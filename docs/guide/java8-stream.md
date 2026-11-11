@@ -228,7 +228,10 @@ strings.stream()
             return s.toUpperCase();
         }).forEach(System.out::println);
 ```
-注意：一定不要在操作流的过程中修改数据源。
+::: warning
+一定不要在操作流的过程中修改数据源。
+
+:::
 
 ## 总结
 java8 流式编程在一定程度上可以使代码变得优美，不过也要避开常见的坑，如：不要重复消费对象、不要修改数据源。

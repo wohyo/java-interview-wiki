@@ -62,7 +62,10 @@ lfu(Least Frequently Used)，最少使用频率。从所有的key中使用近似
 
 lfu(Least Frequently Used)，最少使用频率。从设置了过期时间的key中使用近似LFU算法进行淘汰。从Redis4.0开始支持。
 
-注意：当使用volatile-lru、volatile-random、volatile-ttl这三种策略时，如果没有设置过期的key可以被淘汰，则和noeviction一样返回错误。
+::: warning
+当使用volatile-lru、volatile-random、volatile-ttl这三种策略时，如果没有设置过期的key可以被淘汰，则和noeviction一样返回错误。
+
+:::
 
 ### LRU算法
 

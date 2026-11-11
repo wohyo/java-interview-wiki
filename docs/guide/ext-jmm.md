@@ -179,7 +179,10 @@ JMM 用八种操作描述主内存和工作内存之间的交互：
 7. 不允许 `unlock` 一个没有被 `lock` 的变量，也不允许 `unlock` 别的线程锁住的变量；
 8. 执行 `unlock` 之前，必须先把变量同步回主内存（`store` + `write`）。
 
-> **重要补充**：这套"八大操作 + 规则"是 JSR-133 之前旧 JMM 的描述方式。JSR-133（Java 5）重写了 JMM，现代规范用 **happens-before** 来定义可见性和有序性。八种操作更像一份"教学模型"，面试可以讲，但别把它当成 JMM 的全部——真正能用来推导程序行为的是 happens-before。
+::: info
+这套"八大操作 + 规则"是 JSR-133 之前旧 JMM 的描述方式。JSR-133（Java 5）重写了 JMM，现代规范用 **happens-before** 来定义可见性和有序性。八种操作更像一份"教学模型"，面试可以讲，但别把它当成 JMM 的全部——真正能用来推导程序行为的是 happens-before。
+
+:::
 
 ## 四、as-if-serial 与数据依赖
 
@@ -323,7 +326,10 @@ VarHandle.releaseFence();   // LoadStore + StoreStore
 VarHandle.fullFence();      // 全屏障
 ```
 
+::: tip
 `sun.misc.Unsafe` 里也有对应的 `loadFence()`、`storeFence()`、`fullFence()`。它们主要给框架、并发容器这类底层代码使用，业务代码基本用不到——但面试问"Java 怎么手动加内存屏障"时能答出来就是加分项。
+
+:::
 
 ## 七、volatile
 
@@ -422,7 +428,10 @@ HotSpot 对 synchronized 做了锁升级优化，对象头 Mark Word 会随竞�
 2. **轻量级锁**：线程在自己的栈帧里建锁记录，用 CAS 把 Mark Word 指向它；失败则自旋重试。
 3. **重量级锁**：自旋失败或竞争激烈，膨胀为 ObjectMonitor，未抢到的线程进入阻塞队列，由操作系统调度。
 
-> 版本提醒：偏向锁在 JDK 15 被 JEP 374 默认禁用，JDK 18 起已移除。面试时如果讲"偏向锁"，最好补一句版本背景，否则容易被追问。
+::: info
+偏向锁在 JDK 15 被 JEP 374 默认禁用，JDK 18 起已移除。面试时如果讲"偏向锁"，最好补一句版本背景，否则容易被追问。
+
+:::
 
 ### 8.4 和 volatile 的对比
 
