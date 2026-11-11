@@ -14,7 +14,7 @@ if判空越多会造成过多的代码分支，后续代码维护也就越来越
 
 ## 2. 糟糕的代码
 
-比如看下面这个例子，使用过多的if判空。
+比如下面这个例子，用了过多的 if 判空。
 
 Person对象里定义了House对象，House对象里定义了Address对象：
 
@@ -88,7 +88,7 @@ public String getCity3(Person person) {
 但是这样简单的代码已经加入了三个退出条件，非常不利于后面代码维护。那怎样才能将代码写的优雅一点呢，下面引入今天的主角"Optional"。
 ## 3. 解决空指针的"银弹"
 
-从Java8开始引入了一个新类 java.util.Optional，这是一个对象的容器，意味着可能包含或者没有包含一个非空的值。下面重点看一下Optional的常用方法：
+从 Java8 开始引入了一个新类 java.util.Optional，这是一个对象的容器，意味着可能包含或者没有包含一个非空的值。下面重点看一下Optional的常用方法：
 
 ```java
 public final class Optional<T> {
@@ -159,7 +159,7 @@ String str2 = null;
 Optional.ofNullable(str2).ifPresent(System.out::println);
 ```
 **filter, map, flatMap**
-在三个方法在前面讲Stream的时候已经详细讲解过，读者可以翻看之前写的文章，这里不再赘述。
+这三个方法在前面讲 Stream 的时候已经详细讲解过，读者可以翻看之前写的文章，这里不再赘述。
 
 **orElse**
 

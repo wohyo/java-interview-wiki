@@ -108,7 +108,7 @@ public class Thread implements Runnable {
 Thread类维护了一个ThreadLocalMap的变量引用。
 ### ThreadLocal类get方法
 
-get获取当前线程的对应的私有变量，是之前set或者通过initialValue的值，代码如下：
+get 获取当前线程对应的私有变量副本，值来自之前的 set 或 initialValue，代码如下：
 
 ```java
 class ThreadLocal<T> {

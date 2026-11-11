@@ -107,8 +107,6 @@ Redis 2.8 以后提供了 Redis Sentinel 哨兵机制来解决这个问题。
 
 Redis Sentinel 是 Redis 高可用的实现方案。Sentinel 是一个管理多个 Redis 实例的工具，它可以实现对 Redis 的监控、通知、自动故障转移。
 
-Redis Sentinel架构图如下：
-
 #### 哨兵模式的原理
 
 哨兵模式的主要作用在于它能够自动完成故障发现和故障转移，并通知客户端，从而实现高可用。哨兵模式通常由一组 Sentinel 节点和一组（或多组）主从复制节点组成。
@@ -160,7 +158,7 @@ Redis Sentinel 是一个特殊的 Redis 节点。在哨兵模式创建时，需�
 
 Redis-Cluster采用无中心结构，每个节点都保存数据，节点之间互相连接从而知道整个集群状态。
 
-如图所示Cluster模式其实就是多个主从复制的结构组合起来的，每一个主从复制结构可以看成一个节点，那么上面的Cluster集群中就有三个节点。
+Cluster 模式其实就是多个主从复制结构组合起来，每一个主从复制结构可以看成一个节点；三主三从的 Cluster 集群就有三个节点。
 
 #### Cluster模式的原理
 
@@ -219,7 +217,7 @@ SET {order:1001}:amount 99
 
 #### 0. 目标
 
-本地搭建三个redis实例（一主两备），实现效果：主实例插入数据备实例可以复制同步过去。
+本地搭建三个redis实例（一主两备），实现效果：主实例插入数据后，备实例可以复制同步过去。
 
 #### 1. 安装docker，运行docker
 
@@ -242,11 +240,11 @@ docker pull redis
 
 下载地址：[https://raw.githubusercontent.com/antirez/redis/5.0/redis.conf](https://raw.githubusercontent.com/antirez/redis/5.0/redis.conf)
 
-拷贝为3三份，如：redis01.conf, redis02.conf, redis03.conf
+拷贝为 3 份，如：redis01.conf, redis02.conf, redis03.conf
 
 打开所有的配置文件，修改如下配置项：
 
-* 注释只监听本地选项，可以远程连接。#bind 127.0.0.1
+* 注释掉只监听本地的配置项，即可远程连接：#bind 127.0.0.1
 * 关闭保护模式 protected-mode no
 * 打开AOF持久化开关 appendonly yes
 #### 4. 启动redis实例
@@ -333,9 +331,9 @@ docker exec -it redis-server-02 redis-cli # 连接实例2
 * 通知（Notification）：哨兵可以将故障转移的结果发送给客户端。
 #### 1. 准备好哨兵配置文件sentinel.conf
 
-官网下载源码包：[https://redis.io/download](https://redis.io/download)解压之后sentinel.conf
+官网下载源码包：[https://redis.io/download](https://redis.io/download) ，解压之后得到 sentinel.conf
 
-拷贝为3三份，如：sentinel01.conf, sentinel02.conf, sentinel03.conf
+拷贝为 3 份，如：sentinel01.conf, sentinel02.conf, sentinel03.conf
 
 打开所有的配置文件，修改如下配置项：
 

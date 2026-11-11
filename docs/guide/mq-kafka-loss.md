@@ -14,7 +14,7 @@
 
 ## 二、生产端丢失
 
-消息从 Producer 到 Broker 的链路上，两个参数决定可靠性：
+消息从 Producer 到 Broker 的链路上，下面几个参数共同决定可靠性：
 
 ```properties
 acks=all                  # 所有 ISR 副本都写入才返回成功

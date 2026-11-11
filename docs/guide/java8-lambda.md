@@ -7,15 +7,15 @@
 > Java 8 吸收其他语言的精髓，带来了函数式编程、lambda 表达式、Stream 流等一系列新特性。
 ## 1. Lambda表达式小试牛刀
 
-Lambada表达式可以理解为：可传递的匿名函数的一种简洁表达方式。Lambda表达式没有名称，同普通方法一样有参数列表、函数主体、返回类型等；
+Lambda表达式可以理解为：可传递的匿名函数的一种简洁表达方式。Lambda表达式没有名称，同普通方法一样有参数列表、函数主体、返回类型等；
 
-下面简单看一个例子，new一个线程打印字符串，采用lambda表达式非常简洁：
+下面简单看一个例子：new 一个线程打印字符串，用 lambda 表达式写非常简洁：
 
 ```java
 new Thread(() -> System.out.println("hello java8 lambda")).start()
 ```
 
-Thread类接受一个Runnable类型实例，查看Jdk源码发现Runnable接口是一个函数式接口，可以直接用lambda表达式替代。
+Thread类接受一个Runnable类型实例；查看Jdk源码可以发现，Runnable接口是一个函数式接口，所以可以直接用lambda表达式代替。
 
 ```java
 @FunctionalInterface
@@ -37,7 +37,7 @@ Lambda表达式语法非常简单：
 (a, b) -> {int sum = a + b; return sum;}
 ```
 
-综上，Lambda表达式模块可以固化为：
+综上，Lambda 表达式的写法可以固化为：
 
 ```java
 (parameter) -> {expression} 或者 (parameter) -> {statements; statements; }
@@ -61,7 +61,7 @@ new Thread(new Runnable() {
 
 ### （1）函数式接口
 
-函数式接口是只定义了一个抽象方法的接口。注意Java8中允许存在默认方法（default），哪怕有很多默认方法，只要有且仅有一个抽象方法，那么这个接口仍然是函数式接口。
+函数式接口是只定义了一个抽象方法的接口。注意 Java8 允许存在默认方法（default）：哪怕有很多默认方法，只要抽象方法有且仅有一个，这个接口仍然是函数式接口。
 
 函数式接口通常在类上有一个注解@FunctionalInterface，如：
 
@@ -74,11 +74,11 @@ public interface Runnable {
 
 ### （2）函数式接口可以干什么？
 
-通常lambda表达式与函数式接口结合一起用，lambda表达式以内联的形式为函数式接口的抽象方法提供实现，把整个表达式作为函数式接口的实例。在没有lambda表达式之前，我们通常会使用匿名内部类的方式实现，详细对比见第一小节的实例代码。
+通常 lambda 表达式与函数式接口结合使用，lambda 表达式以内联的形式为函数式接口的抽象方法提供实现，把整个表达式作为函数式接口的实例。在没有 lambda 表达式之前，我们通常会使用匿名内部类的方式实现，详细对比见第一小节的实例代码。
 
 ### （3）函数描述符
 
-函数式接口抽象方法的签名基本上就是lambda表达式的签名，我们可以将这种对应关系称为函数描述符。由一个函数式接口的抽象方法抽象为一个函数描述符，这个过程非常重要，知道了函数描述符去写lambda表达式也就非常容易了。举个例子：
+函数式接口抽象方法的签名基本上就是lambda表达式的签名，我们可以将这种对应关系称为函数描述符。把一个函数式接口的抽象方法抽象为一个函数描述符，这个过程非常重要，知道了函数描述符去写lambda表达式也就非常容易了。举个例子：
 
 Runnable接口有一个抽象方法 void run(), 接受空参数返回void，那么函数描述符可以推导为： () -&gt; void
 
@@ -86,7 +86,7 @@ lambda表达式可以写为 () -&gt; System.out.println("hello java8 lambda")
 
 ### （4）常用函数式接口
 
-java8 中常用函数式接口，针对基本类型java还定义了IntPredicate, LongPredicate等类型，详细可以参考jdk源码。
+Java8 中常用的函数式接口如下；针对基本类型，Java 还定义了 IntPredicate、LongPredicate 等类型，详细可以参考 JDK 源码。
 
 |函数式接口|函数描述符|
 |:----|:----|
@@ -125,7 +125,7 @@ length是String类的实例方法，方法引用写为 String::length，对应la
 
 * **现有对象的实例方法的方法引用**
 
-第三种容易与第二种混淆，现有对象指的是在lambda表达式中调用外部对象（不是入参对象）的实例方法，比如：
+第三种容易与第二种混淆，这里的“现有对象”指的是 lambda 表达式中调用实例方法时用到的那个外部对象（不是入参对象），比如：
 
 String str = "hello java8";
 
