@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { registerSW } from 'virtual:pwa-register'
 
 const needRefresh = ref(false)
 
-const updateSW = registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    needRefresh.value = true
-  },
-  onOfflineReady() {},
+// registerSW 不能在 SSR 期间执行（Node 没有 navigator），必须放进 onMounted
+let updateSW: ((reloadPage?: boolean) => Promise<void>) | undefined
+
+onMounted(() => {
+  updateSW = registerSW({
+    immediate: true,
+    onNeedRefresh() {
+      needRefresh.value = true
+    },
+    onOfflineReady() {},
+  })
 })
 
 function close() {
@@ -17,7 +22,7 @@ function close() {
 }
 
 function refresh() {
-  updateSW(true)
+  updateSW?.(true)
 }
 </script>
 
