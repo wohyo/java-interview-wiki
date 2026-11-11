@@ -69,7 +69,7 @@ export default withPwa(defineConfig({
   },
 
   pwa: {
-    registerType: 'autoUpdate',
+    registerType: 'prompt',
     manifest: {
       name: 'Java 知识手册',
       short_name: 'Java 手册',
